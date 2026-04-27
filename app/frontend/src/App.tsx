@@ -8,8 +8,6 @@ interface Result {
   filename: string;
 }
 
-const API = import.meta.env.VITE_API_URL ?? "";
-
 export default function App() {
   const [reports, setReports] = useState<string[]>([]);
   const [selected, setSelected] = useState("");
@@ -19,7 +17,7 @@ export default function App() {
   const [result, setResult] = useState<Result | null>(null);
 
   useEffect(() => {
-    fetch(`${API}/reports`)
+    fetch("/reports")
       .then((r) => r.json())
       .then((data) => setReports(data.reports))
       .catch(() => setError("Kunne ikke hente rapportliste fra backend."));
@@ -32,7 +30,7 @@ export default function App() {
     setResult(null);
 
     try {
-      const res = await fetch(`${API}/evaluate`, {
+      const res = await fetch("/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename: selected, notes }),
