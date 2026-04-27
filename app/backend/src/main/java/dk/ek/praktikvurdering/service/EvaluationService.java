@@ -48,7 +48,7 @@ public class EvaluationService {
         this.outputDir  = Paths.get(outputDirStr).toAbsolutePath();
 
         Dotenv dotenv = Dotenv.configure()
-                .directory(Paths.get("").toAbsolutePath().toString())
+                .directory(Paths.get("app/backend").toAbsolutePath().toString())
                 .ignoreIfMissing()
                 .load();
 
