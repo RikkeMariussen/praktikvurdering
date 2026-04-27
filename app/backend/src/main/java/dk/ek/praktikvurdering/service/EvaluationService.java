@@ -1,6 +1,8 @@
 package dk.ek.praktikvurdering.service;
 
 import io.github.cdimascio.dotenv.Dotenv;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -24,29 +26,38 @@ public class EvaluationService {
 
     private static final Pattern SAFE_FILENAME = Pattern.compile("^[\\w\\-]+\\.md$");
 
-    private final Path dataDir;
-    private final Path promptsDir;
-    private final Path outputDir;
-    private final RestClient restClient;
-    private final String model;
+    @Value("${app.data-dir}")
+    private String dataDirStr;
 
-    public EvaluationService() {
-        // Arbejdsmappe når man kører fra app/backend/ er app/backend/
-        // To niveauer op giver projektroden: praktikvurdering/
-        Path backendDir = Paths.get("").toAbsolutePath();
-        Path projectRoot = backendDir.getParent().getParent();
+    @Value("${app.prompts-dir}")
+    private String promptsDirStr;
+
+    @Value("${app.output-dir}")
+    private String outputDirStr;
+
+    private Path dataDir;
+    private Path promptsDir;
+    private Path outputDir;
+    private RestClient restClient;
+    private String model;
+
+    @PostConstruct
+    public void init() {
+        this.dataDir    = Paths.get(dataDirStr).toAbsolutePath();
+        this.promptsDir = Paths.get(promptsDirStr).toAbsolutePath();
+        this.outputDir  = Paths.get(outputDirStr).toAbsolutePath();
 
         Dotenv dotenv = Dotenv.configure()
-                .directory(backendDir.toString())
+                .directory(Paths.get("").toAbsolutePath().toString())
                 .ignoreIfMissing()
                 .load();
 
         String apiKey = dotenv.get("OPENAI_API_KEY", System.getenv("OPENAI_API_KEY"));
         this.model = dotenv.get("OPENAI_MODEL", "gpt-4o");
 
-        this.dataDir = projectRoot.resolve("data");
-        this.promptsDir = projectRoot.resolve("prompts");
-        this.outputDir = projectRoot.resolve("output");
+        System.out.println("data-dir:    " + dataDir);
+        System.out.println("prompts-dir: " + promptsDir);
+        System.out.println("output-dir:  " + outputDir);
 
         this.restClient = RestClient.builder()
                 .baseUrl("https://api.openai.com/v1")
@@ -63,7 +74,8 @@ public class EvaluationService {
                     .sorted()
                     .collect(Collectors.toList());
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Kunne ikke læse data-mappe");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Kunne ikke læse data-mappe: " + dataDir);
         }
     }
 
@@ -76,10 +88,10 @@ public class EvaluationService {
         }
 
         try {
-            String systemPrompt = Files.readString(promptsDir.resolve("system-prompt.md"));
+            String systemPrompt  = Files.readString(promptsDir.resolve("system-prompt.md"));
             String reportContent = Files.readString(reportPath);
 
-            String stem = filename.replace(".md", "");
+            String stem           = filename.replace(".md", "");
             String outputFilename = stem + "-vurdering.md";
 
             StringBuilder userMessage = new StringBuilder("Vurdér følgende praktikrapport ud fra rubricen.\n\n");

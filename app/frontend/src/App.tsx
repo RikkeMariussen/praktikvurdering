@@ -18,9 +18,9 @@ export default function App() {
 
   useEffect(() => {
     fetch("/reports")
-      .then((r) => r.json())
-      .then((data) => setReports(data.reports))
-      .catch(() => setError("Kunne ikke hente rapportliste fra backend."));
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((data) => setReports(data.reports ?? []))
+      .catch(() => setError("Kunne ikke hente rapportliste — er backenden startet?"));
   }, []);
 
   async function runEvaluation() {
