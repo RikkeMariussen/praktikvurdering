@@ -1,11 +1,26 @@
 services:
+  # Backend – Python/FastAPI
   - type: web
     name: praktikvurdering-api
     runtime: python
+    rootDir: app/backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
-        sync: false        # Udfyldes manuelt i Render dashboard
+        sync: false
       - key: OPENAI_MODEL
         value: gpt-4o
+      - key: CORS_ORIGINS
+        value: https://praktikvurdering.wrubberduck.dk
+
+  # Frontend – React/Vite som statisk site
+  - type: web
+    name: praktikvurdering
+    runtime: static
+    rootDir: app/frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://api.praktikvurdering.wrubberduck.dk

@@ -153,53 +153,87 @@ Rediger [`prompts/system-prompt.md`](prompts/system-prompt.md) direkte. Ændring
 
 ## Deploy til produktion
 
-> GitHub Pages kan kun hoste statiske filer. Frontenden deployes til Pages, backenden deployes separat til Render.com (gratis tier).
+Både frontend og backend hostes på Render.com. Deployment sker automatisk ved push til `main` via GitHub Actions. OpenAI-nøglen gemmes udelukkende som GitHub Secret og sendes til Render via API — den tastes aldrig ind manuelt nogen steder.
 
 ### Arkitektur i produktion
 
 ```
-GitHub Pages  ←→  Render.com (FastAPI)  ←→  OpenAI API
-(frontend)         (backend)
+praktikvurdering.wrubberduck.dk     api.praktikvurdering.wrubberduck.dk
+        │                                          │
+  Render Static Site               Render Web Service (FastAPI)
+     (frontend)                          (backend)
+                                              │
+                                         OpenAI API
 ```
 
-### Trin 1 – Opret GitHub-repo og aktiver Pages
+### Trin 1 – Opret GitHub-repo og push koden
 
-1. Opret et nyt repo på GitHub og push koden
-2. Gå til **Settings → Pages → Source** og vælg **"GitHub Actions"**
+```bash
+git init
+git add .
+git commit -m "first commit"
+git remote add origin https://github.com/DITBRUGERNAVN/REPO.git
+git push -u origin main
+```
 
-### Trin 2 – Deploy backend til Render
+### Trin 2 – Opret services på Render
 
-1. Gå til [render.com](https://render.com) og opret en konto
-2. Vælg **New → Web Service** og peg på dit GitHub-repo
-3. Sæt **Root Directory** til `app/backend`
-4. Render finder automatisk `render.yaml` og konfigurerer servicen
-5. Under **Environment** i Render-dashboardet tilføjes:
-   - `OPENAI_API_KEY` = din OpenAI-nøgle
-   - `CORS_ORIGINS` = `https://DITBRUGERNAVN.github.io`
-6. Kopiér URL'en til din Render-service (fx `https://praktikvurdering-api.onrender.com`)
+1. Gå til [render.com](https://render.com) og log ind
+2. Vælg **New → Blueprint** og peg på dit GitHub-repo
+3. Render finder `render.yaml` automatisk og opretter begge services:
+   - `praktikvurdering-api` (Web Service – Python)
+   - `praktikvurdering` (Static Site – React)
+4. Find Render API-nøgle under **Account → API Keys** — brug denne som GitHub Secret
 
-### Trin 3 – Tilføj GitHub Secrets
+### Trin 3 – Find service-ID til backend
+
+1. Åbn `praktikvurdering-api`-servicen i Render-dashboardet
+2. Gå til **Settings** — service-ID'et vises i URL'en: `https://dashboard.render.com/web/srv-XXXXXXXXXX`
+3. Kopiér `srv-XXXXXXXXXX` — det er din `RENDER_SERVICE_ID`
+
+### Trin 4 – Tilføj GitHub Secrets
 
 I dit GitHub-repo: **Settings → Secrets and variables → Actions → New repository secret**
 
-| Secret | Værdi |
-|--------|-------|
-| `VITE_API_URL` | URL fra Render, fx `https://praktikvurdering-api.onrender.com` |
+| Secret | Værdi | Hvor finder du den |
+|--------|-------|-------------------|
+| `OPENAI_API_KEY` | Din OpenAI API-nøgle | platform.openai.com → API keys |
+| `RENDER_API_KEY` | Render API-nøgle | render.com → Account → API Keys |
+| `RENDER_SERVICE_ID` | Backend service-ID | Render dashboard URL: `srv-...` |
 
-### Trin 4 – Push til main
+### Trin 5 – Tilføj egne domæner i Render
 
-Workflow-filen i `.github/workflows/deploy.yml` kører automatisk ved hvert push til `main` og deployer frontenden til:
+For hver service under **Settings → Custom Domains**:
 
-```
-https://DITBRUGERNAVN.github.io/REPO-NAVN/
-```
+| Service | Domæne |
+|---------|--------|
+| `praktikvurdering` (frontend) | `praktikvurdering.wrubberduck.dk` |
+| `praktikvurdering-api` (backend) | `api.praktikvurdering.wrubberduck.dk` |
+
+Render viser en CNAME-værdi for hvert domæne — brug den i næste trin.
+
+### Trin 6 – Tilføj DNS-poster
+
+Hos din DNS-udbyder tilføjes to CNAME-poster:
+
+| Navn | Type | Værdi |
+|------|------|-------|
+| `praktikvurdering` | CNAME | vist i Render (fx `praktikvurdering.onrender.com`) |
+| `api.praktikvurdering` | CNAME | vist i Render (fx `praktikvurdering-api.onrender.com`) |
+
+### Trin 7 – Push til main
+
+Fra nu af kører GitHub Actions automatisk ved hvert push og:
+1. Sender den nyeste `OPENAI_API_KEY` fra GitHub Secrets til Render
+2. Trigger et nyt deploy af backenden
+
+Frontenden deployes automatisk af Render ved push til `main` (styret af `render.yaml`).
 
 ### API-nøgle – lokalt vs. produktion
 
 | Miljø | Hvor |
 |-------|------|
 | Lokal udvikling | `app/backend/.env` (aldrig i git — se `.gitignore`) |
-| Produktion (Render) | Environment variable i Render-dashboardet |
-| CI/CD-workflow | GitHub Secret `VITE_API_URL` (backend-URL, ikke selve nøglen) |
+| Produktion | Sendes automatisk fra GitHub Secret til Render via workflow |
 
-> OpenAI-nøglen forlader aldrig backenden. Frontenden kender kun URL'en til din Render-service.
+> OpenAI-nøglen forlader aldrig backenden. Frontenden kender kun URL'en `https://api.praktikvurdering.wrubberduck.dk`.
